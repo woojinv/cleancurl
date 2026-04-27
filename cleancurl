@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+import sys
+import re
+import subprocess
+
+
+def clean_curl(curl_cmd):
+    # 1. Redact the Bearer Token
+    # Looks for 'Authorization: Bearer ' and replaces everything after it until a quote
+    curl_cmd = re.sub(r"(Authorization:\s*Bearer\s+)[^'\"]+", r"\1[REDACTED]", curl_cmd)
+
+    # 2. Remove the Cookie header and its trailing slash/newline
+    # Looks for --header 'Cookie: ...' \ and removes the entire line
+    curl_cmd = re.sub(r"--header\s+['\"]Cookie:[^'\"]+['\"]\s*\\?\n?", "", curl_cmd)
+
+    # Clean up any lingering empty lines to keep the formatting neat
+    curl_cmd = "\n".join([line for line in curl_cmd.splitlines() if line.strip()])
+
+    return curl_cmd
+
+
+def copy_to_clipboard(text):
+    # Sends the cleaned text to Mac's pbcopy tool
+    p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+    p.communicate(input=text.encode("utf-8"))
+
+
+if __name__ == "__main__":
+    input_text = ""
+
+    # Check if input is piped in (e.g., pbpaste | cleancurl)
+    if not sys.stdin.isatty():
+        input_text = sys.stdin.read()
+    # Otherwise, check if it was passed as an argument
+    elif len(sys.argv) > 1:
+        input_text = sys.argv[1]
+    else:
+        print("Usage: cleancurl '<curl_command>'")
+        print("   Or: pbpaste | cleancurl")
+        sys.exit(1)
+
+    if input_text.strip():
+        cleaned_text = clean_curl(input_text)
+        copy_to_clipboard(cleaned_text)
+        print("✅ Cleaned curl command copied to your clipboard!")
+    else:
+        print("❌ No input provided.")
